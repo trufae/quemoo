@@ -1,22 +1,29 @@
-VERSION=73
+DISKSIZE=5G
+RAMSIZE=1G
+OPENBSD_VERSION=73
+TELNET_CONSOLE=
+
+QEMU_FLAGS=
+ifneq ($(TELNET_CONSOLE),)
+QEMU_FLAGS+=-serial tcp::${TELNET_CONSOLE},server,telnet,wait
+endif
 
 all:
-	#$(MAKE) arm64
-	$(MAKE) ppc
-#	$(MAKE) ppc64
-#	$(MAKE) sparc64
+	@echo openbsd-arm64
+	@echo openbsd-sparc64
+	@echo debian10-ppc
 
 arm64:
 	qemu-system-aarch64 \
 		-M virt \
-		-m 512 \
+		-m ${RAMSIZE} \
 		-cpu host \
 		-smp 6 \
 		-machine type=virt,accel=hvf \
 		-bios QEMU_EFI.fd \
 		-drive file=obsd-arm64.qcow2,if=none,id=drive0,format=qcow2 \
 		-device virtio-blk-device,drive=drive0 \
-		-nographic
+		-nographic $(QEMU_FLAGS)
 install:
 	qemu-system-aarch64 \
 		-M virt \
@@ -25,15 +32,14 @@ install:
 		-bios QEMU_EFI.fd \
 		-drive file=miniroot72.img,format=raw,id=drive1 \
 		-drive file=obsd-arm64.qcow2,if=none,id=drive0,format=qcow2 \
-		-nographic \
-		-serial tcp::4450,server,telnet,wait
+		-nographic $(QEMU_FLAGS)
 
 down:
 	wget http://releases.linaro.org/components/kernel/uefi-linaro/latest/release/qemu64/QEMU_EFI.fd
-	qemu-img create -f qcow2 obsd-arm64.qcow2 5G
+	qemu-img create -f qcow2 obsd-arm64.qcow2 ${DISKSIZE}
 
 obsd-ppc64.qcow2:
-	qemu-img create -f qcow2 obsd-ppc64.qcow2 5G
+	qemu-img create -f qcow2 obsd-ppc64.qcow2 ${DISKSIZE}
 
 .PHONY: ppc64 ppc
 ppc64: obsd-ppc64.qcow2
@@ -55,14 +61,14 @@ ppc64: obsd-ppc64.qcow2
 		-drive file=ppc64/miniroot72.img,format=raw \
 		-drive file=obsd-ppc64.qcow2,if=none,id=drive0,format=qcow2 \
 		-boot c \
-		-nographic
+		-nographic $(QEMU_FLAGS)
 
 obsd-ppc.qcow2:
-	qemu-img create -f qcow2 obsd-ppc.qcow2 5G
+	qemu-img create -f qcow2 obsd-ppc.qcow2 ${DISKSIZE}
 
 # http://gemmei.ftp.acc.umu.se/mirror/cdimage/ports/10.0/powerpc/iso-cd/debian-10.0-powerpc-NETINST-1.iso
-ppc: obsd-ppc.qcow2
-	wget http://gemmei.ftp.acc.umu.se/mirror/cdimage/ports/11.0/powerpc/iso-cd/debian-11.0-powerpc-NETINST-1.iso
+debian10-ppc ppc: obsd-ppc.qcow2
+	wget http://gemmei.ftp.acc.umu.se/mirror/cdimage/ports/10.0/powerpc/iso-cd/debian-10.0-powerpc-NETINST-1.iso
 	mkdir -p ppc
 	cd ppc && wget -c https://cdn.openbsd.org/pub/OpenBSD/7.2/macppc/cd72.iso
 #./qemu-system-ppc -L pc-bios -boot d -M mac99,via=pmu -m 512 -hda <hd image file> -cdrom <iso file of installation media> \
@@ -75,15 +81,16 @@ ppc: obsd-ppc.qcow2
 		-drive file=obsd-ppc.qcow2,if=none,id=drive0,format=qcow2 \
 		-cdrom ppc/debppc.iso \
 		-boot d \
-		-nographic
+		-nographic $(QEMU_FLAGS)
 
 #-serial tcp::4450,server,telnet,wait
 
 obsd-sparc64.qcow2:
-	qemu-img create -f qcow2 obsd-sparc64.qcow2 5G
+	qemu-img create -f qcow2 obsd-sparc64.qcow2 ${DISKSIZE}
 
+# https://codemadness.org/openbsd-sparc64-vm.html
 # sparc station bootrom files https://github.com/andarazoroflove/sparc
-sparc64: obsd-sparc64.qcow2
+openbsd-sparc64: obsd-sparc64.qcow2
 	mkdir -p sparc64
 	cd sparc64 && wget -c https://cdn.openbsd.org/pub/OpenBSD/7.2/sparc64/cd72.iso
 	qemu-system-sparc64 \
@@ -96,9 +103,9 @@ sparc64: obsd-sparc64.qcow2
 		-cdrom sparc64/cd72.iso \
 		-device ide-hd,bus=ide.0,unit=0,drive=drive-ide0-0-1,id=ide0-0-1 \
 		-msg timestamp=on \
-		-nographic \
+		-nographic $(QEMU_FLAGS) \
 		-net nic,model=ne2k_pci -net user
 
 #-serial pty -nographic
 
-.PHONY: sparc64
+.PHONY: openbsd-sparc64
